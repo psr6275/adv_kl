@@ -30,3 +30,4 @@ def kl_loss(output, target,reverse = False):
         loss = -torch.sum(target_prob*torch.log(output_prob/target_prob))
 
     return loss
+
