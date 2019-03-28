@@ -2,3 +2,5 @@
 
 jupyter/
 
+#ignore raw data
+data/raw/

@@ -91,10 +91,10 @@ def main():
 
 
     trainset = dataloader(root = './data',train=True, download=True,transform = transform_train)
-    trainloader = data.Dataloader(trainset, batch_size=args.train_batch, shuffle=True, num_workers=args.workers)
+    trainloader = data.DataLoader(trainset, batch_size=args.train_batch, shuffle=True, num_workers=args.workers)
 
     testset = dataloader(root='./data', train=False, download=True,transform=transform_test)
-    testloader = data.Dataloader(testset, batch_size=args.train_batch, shuffle=True, num_workers=args.workers)
+    testloader = data.DataLoader(testset, batch_size=args.train_batch, shuffle=True, num_workers=args.workers)
 
     ## construct classifier model
     if args.dataset == 'mnist':
@@ -164,10 +164,10 @@ def load_data(dataset = "mnist",transform=False, train_batch=128,
         transform_test = transforms.Compose([transforms.ToTensor()])
 
     trainset = dataloader(root='./data', train=True, download=True, transform=transform_train)
-    trainloader = data.Dataloader(trainset, batch_size=train_batch, shuffle=True, num_workers=workers)
+    trainloader = data.DataLoader(trainset, batch_size=train_batch, shuffle=True, num_workers=workers)
 
     testset = dataloader(root='./data', train=False, download=True, transform=transform_test)
-    testloader = data.Dataloader(testset, batch_size=test_batch, shuffle=True, num_workers=workers)
+    testloader = data.DataLoader(testset, batch_size=test_batch, shuffle=True, num_workers=workers)
 
     return trainloader, testloader
 
