@@ -14,7 +14,7 @@ import torch.utils.data as data
 import matplotlib.pyplot as plt
 
 # User-defined parts
-from utils import mkdir_p,accuracy,AverageMeter, Logger, savefig, kl_loss
+from utils import mkdir_p,accuracy,AverageMeter, Logger, savefig, kl_loss, custom_DataLoader
 import models
 
 __all__=['load_data','load_model','train_clf','test_clf','train_dae','test_dae','noise']
