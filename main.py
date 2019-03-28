@@ -6,7 +6,7 @@ import shutil
 
 import torch
 import torch.nn as nn
-import torch.optm as optim
+import torch.optim as optim
 from torch.autograd import Variable
 from torchvision import datasets, transforms
 import torch.utils.data as data
@@ -32,7 +32,7 @@ parser.add_argument('--test-batch', default=100, type=int, metavar='N',
                     help='test batchsize')
 
 # classifier
-parser.add_argument('--load_clf',type=str,defaut=None, help = 'Specify the load path of classifiers. {None:train}')
+parser.add_argument('--load_clf',type=str,default=None, help = 'Specify the load path of classifiers. {None:train}')
 parser.add_argument('--tansform',type=bool,default=False,help='add transformation for (clf or dae)')
 
 # Learning Parameters
@@ -42,7 +42,7 @@ parser.add_argument('--weight-decay','--wd',default=5e-4,type=float, metavar='W'
 parser.add_argument('--epochs',default=30, type=int, help='number of epochs to run')
 
 # PGD attacks
-parser.add_argument('--eps',type=float,default=8/255. help='pgd bound')
+parser.add_argument('--eps',type=float,default=8/255, help='pgd bound')
 parser.add_argument('--niters',type=int,default=20, help='pgd steps')
 parser.add_argument('--alpha',type=float,default=2/255,help='pgd steps')
 
