@@ -17,6 +17,8 @@ import matplotlib.pyplot as plt
 from utils import mkdir_p,accuracy,AverageMeter, Logger, savefig, kl_loss
 import models
 
+__all__=['load_data','load_model','train_clf','test_clf','train_dae','test_dae','noise']
+
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
