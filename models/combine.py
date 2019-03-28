@@ -3,16 +3,16 @@ import torch
 __all__ = ['combine_model']
 
 class CombineModel(nn.Module):
-    def __init__(self,model_dae,model_clf,type = 'recon'):
-        super(COBINE_MODEL,self).__init__()
+    def __init__(self,model_dae,model_clf,dae_type = 'recon'):
+        super(CombineModel,self).__init__()
         self.model_dae = model_dae
         self.model_clf = model_clf
-        assert type in ['recon','denoi'], "Error! type should be in [recon, denoi]"
-        self.type = type # another option is 'denoi'
+        assert dae_type in ['recon','denoi'], "Error! type should be in [recon, denoi]"
+        self.dae_type = dae_type # another option is 'denoi'
 
     def forward(self,x):
         x_ = self.model_dae(x)
-        if type =='recon':
+        if self.dae_type =='recon':
             out = self.model_clf(x_)
         else:
             out = torch.clamp(x+x_,0,1)
@@ -20,5 +20,5 @@ class CombineModel(nn.Module):
         return x_, out
 
 def combine_model(**kwargs):
-
-    return CombineModel(**kwargs)
+    model = CombineModel(**kwargs)
+    return model

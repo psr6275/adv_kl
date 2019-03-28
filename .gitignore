@@ -5,3 +5,6 @@ jupyter/
 #ignore raw data
 data/raw/
 data/processed/
+
+#ignore checkpoint 
+checkpoint/

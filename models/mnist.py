@@ -2,10 +2,14 @@ import numpy as np
 import torch.nn as nn
 
 __all__ = ['mnist','fashion_mnist']
+
+class Flatten(nn.Module):
+    def forward(self, x):
+        return x.view(x.size()[0],-1)
 class MNIST(nn.Module):
     def __init__(self):
         super(MNIST, self).__init__()
-        self.classfier = nn.Sequential(
+        self.classifier = nn.Sequential(
             nn.Conv2d(1, 16, 4),
             nn.ReLU(),
             nn.Conv2d(16, 32, 4),
@@ -24,7 +28,7 @@ class FMNIST():
     def __init__(self):
         print("fashio mnist")
 
-class MNIST_DAE():
+class MNIST_DAE(nn.Module):
     def __init__(self):
         super(MNIST_DAE,self).__init__()
         self.recon = nn.Sequential(

@@ -171,13 +171,13 @@ def load_data(dataset = "mnist",transform=False, train_batch=128,
 
     return trainloader, testloader
 
-def load_model(dataset = "mnist",checkpoint = 'checkpoint', load_clf=None,type = 'recon'):
+def load_model(dataset = "mnist",checkpoint = 'checkpoint', load_clf=None,dae_type = 'recon'):
 
     if not os.path.isdir(checkpoint):
         mkdir_p(checkpoint)
 
     assert dataset in model_names, 'Error: should choice models among '+model_names
-
+    print(models.__dict__[dataset]())
     if dataset == 'mnist':
         model_clf,model_dae = models.__dict__[dataset](
 
@@ -196,8 +196,8 @@ def load_model(dataset = "mnist",checkpoint = 'checkpoint', load_clf=None,type =
 
         )
 
-    model_clf = nn.DataParallel(model_clf).cuda()
-    model_dae = nn.DataParallel(model_dae).cuda()
+    #model_clf = nn.DataParallel(model_clf).cuda()
+    #model_dae = nn.DataParallel(model_dae).cuda()
 
     # Model Load or Train!
     if load_clf:
@@ -206,9 +206,11 @@ def load_model(dataset = "mnist",checkpoint = 'checkpoint', load_clf=None,type =
         checkpoint = os.path.dirname(load_clf)
         checkpoint = torch.load(load_clf)
         model_clf.load_state_dict(checkpoint['state_dict'])
-    model_comb = models.combine_model(model_dae, model_clf,type)
-    model_comb = nn.DataParallel(model_comb)
-    return model_clf, model_dae, model_comb.cuda()
+    model_comb = models.combine_model(model_dae=model_dae, model_clf = model_clf,dae_type="recon")
+    model_clf = nn.DataParallel(model_clf).cuda()
+    model_dae = nn.DataParallel(model_dae).cuda()
+    model_comb = nn.DataParallel(model_comb).cuda()
+    return model_clf, model_dae, model_comb
 
 
 
@@ -227,7 +229,7 @@ def train_clf(model,trainloader,testloader,criterion = nn.CrossEntropyLoss(), lr
         # Calculate Test error!
         test_loss, test_acc, test_acc3 = test_clf(model, testloader, criterion)
         print('Training/Test [loss] %.4f / %.4f, [top1] %.2f / %.2f, [top3] %.2f / %.2f' %
-              (losses.avg,test_loss, 100*top1.avg, 100*test_acc, 100*top3.avg, 100*test_acc3))
+              (losses.avg,test_loss, top1.avg, test_acc, top3.avg, test_acc3))
         #print('Test [loss] %.4f, [top1]')
         logger.append([losses.avg,top1.avg,top3.avg, test_loss, test_acc,test_acc3])
         # save_model
@@ -244,7 +246,7 @@ def train_clf(model,trainloader,testloader,criterion = nn.CrossEntropyLoss(), lr
 
     logger.close()
     logger.plot()
-    savefig()
+    savefig(checkpoint+'/'+dataset)
     print('Best acc:')
     print(best_acc)
 
@@ -266,7 +268,7 @@ def train_clf_step(model,trainloader,epoch,epochs,criterion,optimizer):
         # print intermediate top1 and top3 error
         prec1, prec3 = accuracy(outputs.data, targets.data, topk=(1, 3))
         if (batch_idx) % 10 == 1:
-            print("Training [Acc] top1: %.2f , top3: %.2f " % (100 * prec1, 100 * prec3))
+            print("Training [Acc] top1: %.2f , top3: %.2f " % ( prec1,  prec3))
         losses.update(loss.data[0], inputs.size(0))
         top1.update(prec1[0], inputs.size(0))
         top3.update(prec3[0], inputs.size(0))
@@ -278,9 +280,9 @@ def train_clf_step(model,trainloader,epoch,epochs,criterion,optimizer):
 
     return losses, top1, top3
 
-def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dae_loss = "KL", lr = 0.001,
+def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dataset = "mnist",dae_loss = "KL", lr = 0.001,
               epochs = 50, tempr = 10, std = 0.1, checkpoint='checkpoint'):
-    assert dae_loss in ['KL, L2, L1','KL_reverse'], 'Error dae_loss should be in [KL, L2, L1, KL_reverse]'
+    assert dae_loss in ['KL', 'L2', 'L1','KL_reverse'], 'Error dae_loss should be in [KL, L2, L1, KL_reverse]'
 
     # Use classifier only for evaluation
     model_clf.eval()
@@ -314,8 +316,8 @@ def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dae_loss 
         test_loss_n, test_acc_n, test_acc3_n = test_clf(model_clf,model_comb, testloader,criterion,dae_loss, std, tempr)
 
         print('Training/cleanTest/noiseTest [loss] %.4f / %.4f / %.4f, [top1] %.2f / %.2f / %.2f, [top3] %.2f / %.2f / %.2f' %
-              (losses.avg, test_loss,test_loss_n, 100 * top1.avg, 100 * test_acc, 100*test_acc_n, \
-               100 * top3.avg, 100 * test_acc3, 100*test_acc3_n))
+              (losses.avg, test_loss,test_loss_n,  top1.avg,  test_acc, test_acc_n, \
+                top3.avg,  test_acc3, test_acc3_n))
         # print('Test [loss] %.4f, [top1]')
         logger.append([losses.avg, top1.avg, top3.avg, test_loss_n, test_acc_n, test_acc3_n])
         # save_model
@@ -362,7 +364,7 @@ def train_dae_step(data_loader, model_clf,model_comb,criterion, optimizer,dae_lo
 
         prec1, prec3 = accuracy(outputs_.data, targets.data, topk=(1, 3))
         if (batch_idx) % 10 == 1:
-            print("Training [loss] %.4f [Acc] top1: %.2f , top3: %.2f " % (loss, 100 * prec1, 100 * prec3))
+            print("Training [loss] %.4f [Acc] top1: %.2f , top3: %.2f " % (loss,  prec1,  prec3))
 
         losses.update(loss.data[0], inputs.size(0))
         top1.update(prec1[0], inputs.size(0))
@@ -401,11 +403,11 @@ def test_clf(model, testloader, criterion):
 
     for batch_idx, (inputs, targets) in enumerate(testloader):
         inputs, targets = inputs.cuda(), targets.cuda()
-        inputs, targets = Variable(inputs, volatile = True), Variable(targets)
+        inputs, targets = Variable(inputs), Variable(targets)
 
         outputs = model(inputs)
         loss = criterion(outputs, targets)
-        prec1, prec3 = accurac(outputs.data, targets.data, topk=(1,3))
+        prec1, prec3 = accuracy(outputs.data, targets.data, topk=(1,3))
         losses.update(loss.data[0],inputs.size(0))
         top1.update(prec1[0],inputs.size(0))
         top3.update(prec3[0],inputs.size(0))
