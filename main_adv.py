@@ -210,7 +210,7 @@ def load_model(dataset = "mnist",checkpoint = 'checkpoint', load_clf=None,dae_ty
     model_clf = nn.DataParallel(model_clf).cuda()
     model_dae = nn.DataParallel(model_dae).cuda()
     model_comb = nn.DataParallel(model_comb).cuda()
-    return model_clf, model_dae, model_comb
+    return model_clf.cuda(), model_dae.cuda(), model_comb.cuda()
 
 
 
@@ -288,9 +288,7 @@ def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dataset =
     model_clf.eval()
 
     best_acc = 0
-    logger = Logger(os.path.join(checkpoint, 'log.txt'), title=dataset)
-    logger.set_names(['Train Loss', 'Train Top1', 'Train Top3', 'Valid Loss','Valid Top1', 'Valid Top3'])
-
+    
     ## Training dae part only!
     optimizer = optim.Adam(model_dae.parameters(),lr=lr)
     if dae_loss == 'L1':
@@ -302,6 +300,10 @@ def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dataset =
     else:
         criterion = kl_loss
         checkpoint = checkpoint+'/dae_kl'
+    if not os.path.isdir(checkpoint):
+        mkdir_p(checkpoint)
+    logger = Logger(os.path.join(checkpoint, 'log.txt'), title=dataset)
+    logger.set_names(['Train Loss', 'Train Top1', 'Train Top3', 'Valid Loss','Valid Top1', 'Valid Top3'])
 
     for epoch in range(epochs):
         model_dae.train()
@@ -313,7 +315,7 @@ def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dataset =
         # test error for clean images and reconstructed images
         test_loss, test_acc, test_acc3 = test_dae(model_clf,model_comb, testloader, criterion,dae_loss, False,tempr)
         #test error for Ganssian corrupted images
-        test_loss_n, test_acc_n, test_acc3_n = test_clf(model_clf,model_comb, testloader,criterion,dae_loss, std, tempr)
+        test_loss_n, test_acc_n, test_acc3_n = test_dae(model_clf,model_comb, testloader,criterion,dae_loss, std, tempr)
 
         print('Training/cleanTest/noiseTest [loss] %.4f / %.4f / %.4f, [top1] %.2f / %.2f / %.2f, [top3] %.2f / %.2f / %.2f' %
               (losses.avg, test_loss,test_loss_n,  top1.avg,  test_acc, test_acc_n, \
@@ -333,7 +335,7 @@ def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dataset =
         }, is_best, checkpoint=checkpoint)
     logger.close()
     logger.plot()
-    savefig()
+    savefig(checkpoint+'/'+dataset)
     print('Best acc:')
     print(best_acc)
             # Test accuracy!
@@ -353,7 +355,7 @@ def train_dae_step(data_loader, model_clf,model_comb,criterion, optimizer,dae_lo
         #noise_ = model_dae(noise_inputs)
         #denoise_inputs = torch.clamp(noise_inputs + noise_, 0, 1)
         #denoise_inputs = model_dae(noise_inputs)
-        outputs_ = model_comb(noise_inputs)
+        _,outputs_ = model_comb(noise_inputs)
 
         if dae_loss == 'KL':
             loss = criterion(outputs_ / tempr, outputs / tempr)
@@ -416,7 +418,7 @@ def test_clf(model, testloader, criterion):
 
     return losses.avg, top1.avg, top3.avg
 
-def test_dae(model_clf, model_comb, testloader, criterion,dae_loss, noise=False, tempr=1):
+def test_dae(model_clf, model_comb, testloader, criterion,dae_loss, noise_std=False, tempr=1):
     losses = AverageMeter()
     top1 = AverageMeter()
     top3 = AverageMeter()
@@ -425,15 +427,15 @@ def test_dae(model_clf, model_comb, testloader, criterion,dae_loss, noise=False,
     model_comb.eval()
 
     for batch_idx, (inputs, targets) in enumerate(testloader):
-        if noise>0:
-            noise_inputs = noise(inputs, noise)
+        if noise_std>0:
+            noise_inputs = noise(inputs, noise_std)
         else:
             noise_inputs = inputs
         noise_inputs, inputs, targets = noise_inputs.cuda(), inputs.cuda(), targets.cuda()
         noise_inputs, inputs, targets = Variable(noise_inputs), Variable(inputs), Variable(targets)
 
         outputs = model_clf(inputs)
-        outputs_ = model_comb(noise_inputs)
+        _,outputs_ = model_comb(noise_inputs)
 
         if dae_loss == 'KL':
             loss = criterion(outputs_ / tempr, outputs / tempr)
