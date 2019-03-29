@@ -417,6 +417,7 @@ def test_clf(model, testloader, criterion):
 
 
     return losses.avg, top1.avg, top3.avg
+
 def test_clf3(model, tripleloader, criterion):
     testloader = tripleloader
     losses = AverageMeter()
