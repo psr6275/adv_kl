@@ -58,7 +58,36 @@ class CustomDataSet(Dataset):
         
         return self.len
 
+class GaussianDataLoader(Dataset):
+    def __init__(self,inputs_tensor, targets_tensor):
+        super(GaussianDataLoader, self).__init__()
+        self.inputs_tensor = inputs_tensor
+        self.targets_tensor=targets_tensor
+        self.len = len(self.targets_tensor)
+        self.generate_random()
+
+    def generate_random(self):
+        self.noise_tensor = noise(self.input_tensor)
+
+    def __getitem__(self, item):
+        img = self.inputs_tensor[item]
+        noise_img = self.noise_tensor[item]
+        target = self.targets_tensor[item]
+        return img, noise_img,target
+
+    def __len__(self):
+        return self.len
+
+
+def noise(X, noise_std, low=0, high=1):
+    X_noise = X + noise_std * torch.randn_like(X)
+    return torch.clamp(X_noise, low, high)
+
 def custom_DataLoader(inputs_list,targets_list,batch_size = 10,shuffle=True,num_workers=16):
     dataset = CustomDataSet(inputs_list,targets_list)
 
     return DataLoader(dataset,batch_size = batch_size, shuffle=shuffle,num_workers=num_workers)
+
+def noise_Dataloader(inputs_tensor, targets_tensor,batch_size=10,shuffle=True, num_workers = 16):
+    dataset = GaussianDataLoader(inputs_tensor,targets_tensor)
+    return DataLoader(dataset, batch_size=batch_size,shuffle=shuffle,num_workers=num_workers)
