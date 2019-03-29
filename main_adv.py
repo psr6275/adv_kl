@@ -172,12 +172,13 @@ def load_data(dataset = "mnist",transform=False, train_batch=128,
     return trainloader, testloader
 
 def load_model(dataset = "mnist",checkpoint = 'checkpoint', load_clf=None,dae_type = 'recon'):
+    checkpoint = checkpoint+'/'+dataset
 
     if not os.path.isdir(checkpoint):
         mkdir_p(checkpoint)
 
     assert dataset in model_names, 'Error: should choice models among '+model_names
-    print(models.__dict__[dataset]())
+    print(models.__dict__[dataset])
     if dataset == 'mnist':
         model_clf,model_dae = models.__dict__[dataset](
 
@@ -215,6 +216,7 @@ def load_model(dataset = "mnist",checkpoint = 'checkpoint', load_clf=None,dae_ty
 
 
 def train_clf(model,trainloader,testloader,criterion = nn.CrossEntropyLoss(), lr = 0.001,epochs = 30, checkpoint = 'checkpoint', dataset = "mnist"):
+    checkpoint = checkpoint+'/'+dataset
     #optimizer = optim.SGD(model.parameters(),lr=args.lr,momentum=args.momentum,weight_decay=args.weight_decay)
     optimizer = optim.Adam(model.parameters(),lr=lr)
     best_acc = 0
@@ -283,6 +285,7 @@ def train_clf_step(model,trainloader,epoch,epochs,criterion,optimizer):
 def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dataset = "mnist",dae_loss = "KL", lr = 0.001,
               epochs = 50, tempr = 10, std = 0.1, checkpoint='checkpoint'):
     assert dae_loss in ['KL', 'L2', 'L1','KL_reverse'], 'Error dae_loss should be in [KL, L2, L1, KL_reverse]'
+    checkpoint = checkpoint+'/'+dataset
 
     # Use classifier only for evaluation
     model_clf.eval()

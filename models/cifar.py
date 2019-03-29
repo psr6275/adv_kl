@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from mnist import Flatten
+from .mnist import Flatten
 
 __all__ = ['cifar10','cifar100']
 class CIFAR10(nn.Module):
@@ -78,7 +78,7 @@ class CIFAR10_DAE(nn.Module):
 class CIFAR100():
     def __init__(self):
         print("cifar100")
-def cifar10():
+def cifar10(**kwargs):
     return CIFAR10(),CIFAR10_DAE()
 
 def cifar100():
