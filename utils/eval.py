@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
-__all__ = ['accuracy','kl_loss','custom_DataLoader','noise_DataLoader','triple_DataLoader']
+__all__ = ['accuracy','kl_loss','custom_DataLoader','noise_DataLoader','triple_DataLoader','CustomDataSet','TripleDataSet','GaussianDataSet']
 
 def accuracy(output, target, topk=(1.)):
     '''Compute the top1 and top k error'''

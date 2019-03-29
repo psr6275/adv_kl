@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from utils import mkdir_p,accuracy,AverageMeter, Logger, savefig, kl_loss, custom_DataLoader
 import models
 
-__all__=['load_data','load_model','train_clf','test_clf','train_dae','test_dae','noise']
+__all__=['load_data','load_model','train_clf','test_clf','test_clf3','train_dae','test_dae','noise']
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -417,6 +417,39 @@ def test_clf(model, testloader, criterion):
 
 
     return losses.avg, top1.avg, top3.avg
+def test_clf3(model, tripleloader, criterion):
+    testloader = tripleloader
+    losses = AverageMeter()
+    losses2 = AverageMeter()
+    top1 = AverageMeter()
+    top12 = AverageMeter()
+    top3 = AverageMeter()
+    top32 = AverageMeter()
+
+    # switch to evaluate mode
+    model.eval()
+
+    for batch_idx, (inputs,inputs2, targets) in enumerate(testloader):
+        inputs,inputs2, targets = inputs.cuda(),inputs2.cuda(), targets.cuda()
+        inputs,inputs2, targets = Variable(inputs),Variable(inputs2), Variable(targets)
+
+        outputs = model(inputs)
+        outputs2 = model(inputs2)
+        loss = criterion(outputs, targets)
+        loss2 = criterion(outputs2,targets)
+        prec1, prec3 = accuracy(outputs.data, targets.data, topk=(1,3))
+        prec12,prec32 = accuracy(outputs2.data,targets.data,topk=(1,3))
+        losses.update(loss.data[0],inputs.size(0))
+        top1.update(prec1[0],inputs.size(0))
+        top3.update(prec3[0],inputs.size(0))
+        losses2.update(loss2.data[0],inputs2.size(0))
+        top12.update(prec12[0],inputs2.size(0))
+        top32.update(prec32[0],inputs2.size(0))
+
+
+
+    return (losses.avg, top1.avg, top3.avg),(losses2.avg,top12.avg,top32.avg)
+
 
 def test_dae(model_clf, model_comb, testloader, criterion,dae_loss, noise_std=False, tempr=1):
     losses = AverageMeter()
