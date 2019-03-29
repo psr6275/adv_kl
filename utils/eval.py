@@ -59,15 +59,16 @@ class CustomDataSet(Dataset):
         return self.len
 
 class GaussianDataLoader(Dataset):
-    def __init__(self,inputs_tensor, targets_tensor):
+    def __init__(self,inputs_tensor, targets_tensor,noise_std = 0.1):
         super(GaussianDataLoader, self).__init__()
         self.inputs_tensor = inputs_tensor
         self.targets_tensor=targets_tensor
+        self.noise_std = noise_std
         self.len = len(self.targets_tensor)
         self.generate_random()
 
     def generate_random(self):
-        self.noise_tensor = noise(self.input_tensor)
+        self.noise_tensor = noise(self.inputs_tensor,self.noise_std)
 
     def __getitem__(self, item):
         img = self.inputs_tensor[item]
