@@ -13,3 +13,7 @@ data/
 
 #ignore checkpoint 
 checkpoint/
+
+#ignore __pycahe__
+__pycahe__/
+models/__pycache__/
