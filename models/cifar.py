@@ -141,13 +141,8 @@ class CIFAR10_DAE(nn.Module):
 class CIFAR100():
     def __init__(self):
         print("cifar100")
-<<<<<<< HEAD
-def cifar10(**kwargs):
-    return CIFAR10(),CIFAR10_DAE()
-=======
 def cifar10():
     return CIFAR10(),CIFAR10_DAE2()
->>>>>>> dfc1a4b4b300b6850c23393982c08257cf1fc9b7
 
 def cifar100():
     return None
