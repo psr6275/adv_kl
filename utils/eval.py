@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
-__all__ = ['accuracy','kl_loss','custom_DataLoader']
+__all__ = ['accuracy','kl_loss','custom_DataLoader','noise_DataLoader','triple_DataLoader']
 
 def accuracy(output, target, topk=(1.)):
     '''Compute the top1 and top k error'''
@@ -58,7 +58,7 @@ class CustomDataSet(Dataset):
         
         return self.len
 
-class GaussianDataLoader(Dataset):
+class GaussianDataSet(Dataset):
     def __init__(self,inputs_tensor, targets_tensor,noise_std = 0.1):
         super(GaussianDataLoader, self).__init__()
         self.inputs_tensor = inputs_tensor
@@ -79,6 +79,21 @@ class GaussianDataLoader(Dataset):
     def __len__(self):
         return self.len
 
+class TripleDataSet(Dataset):
+    def __init__(self,inputs_tensor1, inputs_tensor2,targets_tensor):
+        super(TripleDataSet, self).__init__()
+        self.inputs1 = inputs_tensor1
+        self.inputs2 = inputs_tensor2
+        self.targets = targets_tensor
+        self.len = len(targets_tensor)
+
+    def __getitem__(self, item):
+        img1 = self.inputs1[item]
+        img2 = self.inputs2[item]
+        target = self.targets[item]
+        return img1, img2, target
+    def __len__(self):
+        return self.len
 
 def noise(X, noise_std, low=0, high=1):
     X_noise = X + noise_std * torch.randn_like(X)
@@ -89,6 +104,10 @@ def custom_DataLoader(inputs_list,targets_list,batch_size = 10,shuffle=True,num_
 
     return DataLoader(dataset,batch_size = batch_size, shuffle=shuffle,num_workers=num_workers)
 
-def noise_Dataloader(inputs_tensor, targets_tensor,batch_size=10,shuffle=True, num_workers = 16):
-    dataset = GaussianDataLoader(inputs_tensor,targets_tensor)
+def noise_DataLoader(inputs_tensor, targets_tensor,batch_size=10,shuffle=True, num_workers = 16):
+    dataset = GaussianDataSet(inputs_tensor,targets_tensor)
     return DataLoader(dataset, batch_size=batch_size,shuffle=shuffle,num_workers=num_workers)
+
+def triple_DataLoader(inputs_tensor1,inputs_tensor2,targets_tensor,batch_size=10,shuffle=True, num_workers = 16):
+    dataset = TripleDataSet(inputs_tensor1,inputs_tensor2,targets_tensor)
+    return DataLoader(dataset,batch_size=batch_size,shuffle=shuffle, num_workers = num_workers)
