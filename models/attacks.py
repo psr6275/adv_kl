@@ -43,31 +43,34 @@ class WhiteBox:
         self.target_model = target_model.eval()
         self.dataloader = dataloader
         self.params = params
-        print("<<<",attacker ," Attack>>>")
+        print("<<<",attacker ," Attack >>>")
         if attacker is "pgd":
             self.attacker = pgd_attack
-        self.tripleDataSet = self.attack_model()
+        self.advDataSet = self.attack_model()
 
-    def attack_model(self):
+    def attack_model(self,target_model = None, dataloader = None):
+        if dataloader is None:
+            dataloader = self.dataloader
+        if target_model is None:
+            target_model = self.target_model
+
         adv_list =[]
         input_list = []
         target_list = []
-        num_batch = len(self.dataloader)
-        for i, (inputs, targets) in enumerate(self.dataloader):
+        num_batch = len(dataloader)
+        for i, (inputs, targets) in enumerate(dataloader):
             inputs = Variable(inputs).cuda()
             targets = Variable(targets).cuda()
-            adv_inputs = self.attacker(self.target_model,inputs,targets,self.params)
+            adv_inputs = self.attacker(target_model,inputs,targets,self.params)
 
-            input_list.append(inputs)
-            target_list.append(targets)
-            adv_list.append(adv_inputs)
+            input_list.append(inputs.data)
+            target_list.append(targets.data)
+            adv_list.append(adv_inputs.data)
             print("attacking batch [%.d/%.d]"%(i,num_batch),end='\r')
         print("\n")
         adv_tensor = torch.cat(adv_list,0)
         input_tensor = torch.cat(input_list,0)
         target_tensor = torch.cat(target_list,0)
-        print(target_list)
-        print(target_tensor)
         print("complete attacks!")
         return TripleDataSet(input_tensor,adv_tensor,target_tensor)
 
