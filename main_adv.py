@@ -137,6 +137,7 @@ def load_data(dataset = "mnist",transform=False, train_batch=128,
     :param transform:
     :return:
     '''
+    datapath = './data/'+dataset
     print('==> preparing dataset %s', dataset)
 
     if dataset == 'mnist':
@@ -163,10 +164,10 @@ def load_data(dataset = "mnist",transform=False, train_batch=128,
         transform_train = transforms.Compose([transforms.ToTensor()])
         transform_test = transforms.Compose([transforms.ToTensor()])
 
-    trainset = dataloader(root='./data', train=True, download=True, transform=transform_train)
+    trainset = dataloader(root=datapath, train=True, download=True, transform=transform_train)
     trainloader = data.DataLoader(trainset, batch_size=train_batch, shuffle=True, num_workers=workers)
 
-    testset = dataloader(root='./data', train=False, download=True, transform=transform_test)
+    testset = dataloader(root=datapath, train=False, download=True, transform=transform_test)
     testloader = data.DataLoader(testset, batch_size=test_batch, shuffle=True, num_workers=workers)
 
     return trainloader, testloader

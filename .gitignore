@@ -3,8 +3,13 @@
 jupyter/
 
 #ignore raw data
-data/raw/
-data/processed/
+#
+#data/raw/
+#data/processed/
+#data/mnist/
+#data/cifar10/
+#data/fasion_mnist
+data/
 
 #ignore checkpoint 
 checkpoint/
