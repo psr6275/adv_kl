@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 import torch
 import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
 
 __all__ = ['accuracy','kl_loss','custom_DataLoader']
 
@@ -31,7 +32,7 @@ def kl_loss(output, target,reverse = False):
 
     return loss
 
-class CustomDataSet(torch.utils.data.Dataset):
+class CustomDataSet(Dataset):
     def __init__(self,inputs_list, targets_list):
         """
 
@@ -46,6 +47,7 @@ class CustomDataSet(torch.utils.data.Dataset):
     def concat_items(self):
         self.inputs = torch.cat(self.inputs_list,0)
         self.targets = torch.cat(self.targets_list,0)
+        self.len = len(self.targets)
 
     def __getitem__(self, item):
         img = self.inputs[item]
@@ -53,10 +55,10 @@ class CustomDataSet(torch.utils.data.Dataset):
         return img, target
 
     def __len__(self):
-        n = self.targets.size[0]
-        return n
+        
+        return self.len
 
 def custom_DataLoader(inputs_list,targets_list,batch_size = 10,shuffle=True,num_workers=16):
     dataset = CustomDataSet(inputs_list,targets_list)
 
-    return torch.utils.data.DataLoader(dataset,batch_size = batch_size, shuffle=shuffle,num_workers=num_workers)
+    return DataLoader(dataset,batch_size = batch_size, shuffle=shuffle,num_workers=num_workers)
