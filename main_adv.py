@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
 from torchvision import datasets, transforms
-import torch.utils.data as data
+import torch.utils.data as data, DataLoader
 
 import matplotlib.pyplot as plt
 
@@ -129,7 +129,86 @@ def main():
 # Train the classifier
         train_clf(model_clf,trainloader)
 
-def load_data(dataset = "mnist",transform=False, train_batch=128,
+class CombinedModel:
+    def __init__(self,dataset='mnist',transform=None,train_batch=128, test_batch = 100, workers=16):
+        self.dataset = dataset
+        self.transform = transform
+        self.train_batch = train_batch
+        self.test_batch = test_batch
+        self.workers = workers
+
+        # Load Dataset
+        self.load_data()
+
+
+    def load_data(self):
+        self.trainloader, self.testloader = load_data(self.dataset, self.transform, self.train_batch,
+                                                  self.test_batch, self.workers)
+
+    def construct_model(self,checkpoint = 'checkpoint', dae_type='recon'):
+        self.checkpoint = checkpoint
+        self.dae_type = dae_type
+        self.model_clf, self.model_dae, self.model_comb = load_model(self.dataset,checkpoint,dae_type)
+
+    def load_model(self,checkpoint, model_type):
+        # should implement
+
+    def train_clf(self, criterion = nn.CrossEntropyLoss(), lr = 0.001, epochs = 30):
+        self.clf_criterion = criterion
+        train_clf(self.model_clf,self.trainloader,self.testloader,self.clf_criterion,
+                  lr,epochs,self.checkpoint,self.dataset)
+
+    def test_clf(self,testloader=None, criterion = None):
+        if testloader is None:
+            testloader = self.testloader
+        if criterion is None:
+            criterion = self.clf_criterion
+        test_clf(self.model_clf,testloader,criterion)
+
+    def train_dae(self, criterion = None, dae_loss = "KL",lr=0.001,tempr=10,std=0.1, epochs = 10):
+        #assert dae_loss in ['KL','L2','L1','KL_reverse'], 'Error dae_loss should be seleted within [KL,L2,L1,KL_reverse]'
+        if criterion is None:
+            if dae_loss == 'L1':
+                self.dae_criterion = nn.L1Loss()
+            elif dae_loss =='L2':
+                self.dae_criterion = nn.L2Loss()
+            else:
+                self.dae_criterion = kl_loss
+            self.dae_checkpoint = self.checkpoint+'/'+dae_loss
+        else:
+            self.dae_criterion = criterion
+            self.dae_loss = dae_loss
+            self.tempr = tempr
+        train_dae(self.mode_dae, self.model_clf, self.model_comb, self.trainloader,self.testloader, self.dataset,
+                  self.dae_criterion, dae_loss,lr,epochs,tempr,std,self.checkpoint)
+
+    def test_dae(self, testloader =None, noise_std=0, tempr=None):
+        if tempr is None:
+            tempr = self.tempr
+        if testloader is None:
+            testlaoder = self.testloader
+        test_dae(self.mode_clf,self.model_comb,testloader, self.criterion, self.dae_loss,noise_std,tempr)
+
+    def whitebox_attack(self,target_model = None, dataloader = None, batch_size = None, target_object = 'clf',
+                        attacker = 'pgd', shuffle = shuffle,
+                        params = {'eps':8/255,'niter':20, 'alpha':2/255,'normalize':'0/1'}):
+        if target_model is None:
+            if target_object == 'clf':
+                target_model = self.model_clf
+            elif target_object == 'dae':
+                target_model = self.model_dae
+        if dataloader is None:
+            dataloader = self.testloader
+        if batch_size is None:
+            batch_size = self.test_batch
+        print("Start to attack: ", target_object)
+        self.advDataset = models.WhiteBox(target_model,dataloader,attacker,params)
+        self.adv_dataloader = DataLoader(self.advDataset.tripleDataSet,batch_size, shuffle=shuffle, num_workers = 0)
+        return self.adv_dataloader
+
+
+
+def load_data(dataset = "mnist",transform=None, train_batch=128,
               test_batch = 100, workers=16):
     '''
 
@@ -149,7 +228,7 @@ def load_data(dataset = "mnist",transform=False, train_batch=128,
     elif dataset == 'cifar100':
         dataloader = datasets.CIFAR100
 
-    if transform and dataset in ['cifar10', 'cifar100']:
+    if transform is not None and dataset in ['cifar10', 'cifar100']:
         transform_train = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
@@ -208,7 +287,7 @@ def load_model(dataset = "mnist",checkpoint = 'checkpoint', load_clf=None,dae_ty
         checkpoint = os.path.dirname(load_clf)
         checkpoint = torch.load(load_clf)
         model_clf.load_state_dict(checkpoint['state_dict'])
-    model_comb = models.combine_model(model_dae=model_dae, model_clf = model_clf,dae_type="recon")
+    model_comb = models.combine_model(model_dae=model_dae, model_clf = model_clf,dae_type=dae_type)
     model_clf = nn.DataParallel(model_clf).cuda()
     model_dae = nn.DataParallel(model_dae).cuda()
     model_comb = nn.DataParallel(model_comb).cuda()
@@ -283,10 +362,10 @@ def train_clf_step(model,trainloader,epoch,epochs,criterion,optimizer):
 
     return losses, top1, top3
 
-def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dataset = "mnist",dae_loss = "KL", lr = 0.001,
+def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dataset = "mnist",dae_criterion = None,dae_loss="KL", lr = 0.001,
               epochs = 50, tempr = 10, std = 0.1, checkpoint='checkpoint'):
-    assert dae_loss in ['KL', 'L2', 'L1','KL_reverse'], 'Error dae_loss should be in [KL, L2, L1, KL_reverse]'
-    checkpoint = checkpoint+'/'+dataset
+    assert dae_criterion is not None, 'Error dae_criterion should be specified ex. nn.L1Loss()'
+    #checkpoint = checkpoint+'/'+dataset
 
     # Use classifier only for evaluation
     model_clf.eval()
@@ -295,6 +374,7 @@ def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dataset =
     
     ## Training dae part only!
     optimizer = optim.Adam(model_dae.parameters(),lr=lr)
+    """
     if dae_loss == 'L1':
         criterion = nn.L1Loss()
         checkpoint = checkpoint+'/dae_l1'
@@ -304,6 +384,7 @@ def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dataset =
     else:
         criterion = kl_loss
         checkpoint = checkpoint+'/dae_kl'
+    """
     if not os.path.isdir(checkpoint):
         mkdir_p(checkpoint)
     logger = Logger(os.path.join(checkpoint, 'log.txt'), title=dataset)
@@ -313,11 +394,11 @@ def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dataset =
         model_dae.train()
         print('\nEpoch: [%d |%d] ' % (epoch + 1, epochs))
 
-        losses, top1, top3 = train_dae_step(trainloader, model_clf,model_comb, criterion, optimizer,dae_loss,tempr,std)
+        losses, top1, top3 = train_dae_step(trainloader, model_clf,model_comb, dae_criterion, optimizer,dae_loss,tempr,std)
 
         # Test models
         # test error for clean images and reconstructed images
-        test_loss, test_acc, test_acc3 = test_dae(model_clf,model_comb, testloader, criterion,dae_loss, False,tempr)
+        test_loss, test_acc, test_acc3 = test_dae(model_clf,model_comb, testloader, dae_criterion,dae_loss, False,tempr)
         #test error for Ganssian corrupted images
         test_loss_n, test_acc_n, test_acc3_n = test_dae(model_clf,model_comb, testloader,criterion,dae_loss, std, tempr)
 
