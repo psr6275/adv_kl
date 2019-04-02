@@ -22,7 +22,11 @@ def pgd_attack(target_model,X,y,params):
     opt = optim.Adam([X_pgd], lr=1.)
     for i in range(niter):
         opt.zero_grad()
-        loss = nn.CrossEntropyLoss()(target_model(X_pgd),y)
+        try:
+            loss = nn.CrossEntropyLoss()(target_model(X_pgd),y)
+        except:
+            _,y_ = target_model(X_pgd)
+            loss = nn.CrossEntropyLoss()(y_,y)
         loss.backward()
         eta = alpha*X_pgd.grad.data.sign()
         X_pgd = Variable(X_pgd.data+eta,requires_grad=True)

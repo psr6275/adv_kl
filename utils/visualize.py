@@ -4,6 +4,8 @@ import torch.nn
 import torchvision
 import numpy as np
 
+__all__ = ['show_prob','show_image']
+
 def show_prob(y_tup,y_true):
     """
 
