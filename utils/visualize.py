@@ -19,7 +19,7 @@ def show_prob(y_tup,y_true):
     for i in range(num_inst):
         for j in range(num_comp):
             plt.subplot(1,num_comp,j+1)
-            plt.bar(np.arange(num_class),y_tup[j][i],align='center',bar_width=0.8)
+            plt.bar(np.arange(num_class),y_tup[j][i],align='center',width=0.8)
         plt.title(y_true[i])
         plt.show()
 
