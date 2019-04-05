@@ -272,20 +272,20 @@ def load_model(dataset = "mnist",checkpoint = 'checkpoint', load_clf=None,dae_ty
     print(models.__dict__[dataset])
     if dataset == 'mnist':
         model_clf,model_dae = models.__dict__[dataset](
-
+            dae_type
         )
 
     elif dataset == 'fashion_mnist':
         model_clf,model_dae = models.__dict__[dataset](
-
+            dae_type
         )
     elif dataset == 'cifar10':
         model_clf, model_dae = models.__dict__[dataset](
-
+            dae_type
         )
     elif dataset == 'cifar100':
         model_clf,model_dae = models.__dict__[dataset](
-
+            dae_type
         )
 
     #model_clf = nn.DataParallel(model_clf).cuda()

@@ -115,6 +115,34 @@ class CIFAR10_DAE2(nn.Module):
         output = self.decoder(output)
         return output.view(-1,3,32,32)
 
+class CIFAR10_NOISE(nn.Module):
+    def __init__(self):
+        super(CIFAR10_NOISE, self).__init__()
+        self.encoder = nn.Sequential(
+            nn.Conv2d(3,DIM,3,2, padding=1),
+            nn.LeakyReLU(),
+            nn.Conv2d(DIM,2*DIM,3,2, padding=1),
+            nn.LeakyReLU(),
+            nn.Conv2d(2*DIM,4*DIM,3,2,padding=1),
+            nn.LeakyReLU(),
+        )
+        self.decoder = nn.Sequential(
+            nn.ConvTranspose2d(4*DIM,2*DIM,2,stride=2),
+            nn.BatchNorm2d(2*DIM),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(2*DIM,DIM,2,stride=2),
+            nn.BatchNorm2d(DIM),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(DIM,3,2,stride=2),
+            nn.Hardtanh(),
+        )
+
+
+    def forward(self,x):
+        output = self.encoder(x)
+        output = self.decoder(output)
+        return output.view(-1,3,32,32)
+
 class CIFAR10_DAE(nn.Module):
     def __init__(self):
         super(CIFAR10_DAE, self).__init__()
@@ -141,8 +169,10 @@ class CIFAR10_DAE(nn.Module):
 class CIFAR100():
     def __init__(self):
         print("cifar100")
-def cifar10():
-    return CIFAR10(),CIFAR10_DAE2()
-
+def cifar10(dae_type):
+    if dae_type == 'recon':
+        return CIFAR10(),CIFAR10_DAE2()
+    else:
+        return CIFAR10(),CIFAR10_NOISE()
 def cifar100():
     return None
