@@ -180,14 +180,14 @@ class CombinedModel:
             self.dae_criterion = criterion
             self.dae_loss = dae_loss
             self.tempr = tempr
-        if dae_type =="recon":
+        if self.dae_type =="recon":
             train_dae(self.model_dae, self.model_clf, self.model_comb, self.trainloader,self.testloader, self.dataset,
                   self.dae_criterion, dae_loss,lr,epochs,tempr,std,self.checkpoint,add_clf_loss)
         else:
             #else means dae_type is denoi!
             self.whitebox_attack(target_model = self.model_clf,dataloader =self.trainloader,batch_size=self.train_batch,params = params)
             #train_adv_noise(self.model_dae,self.model_comb)
-            train_dae(self.model_dae, self.model_clf, self.model_comb, self.trainloader,self.testloader, self.dataset,
+            train_dae(self.model_dae, self.model_clf, self.model_comb, self.advloader,self.testloader, self.dataset,
                   self.dae_criterion, dae_loss,lr,epochs,tempr,std,self.checkpoint,add_clf_loss,True)
 
     def test_dae(self, testloader =None, noise_std=0, tempr=None):
@@ -407,7 +407,7 @@ def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dataset =
         print('\nEpoch: [%d |%d] ' % (epoch + 1, epochs))
         if adv_expl:
             #Here, trainloader is advloader!!
-            losses, top1, top3 = train_adv_step(trainloader, model_clf,model_comb, dae_criterion, optimizer,dae_loss,tempr,std,add_clf_loss)
+            losses, top1, top3 = train_adv_step(trainloader, model_clf,model_comb, dae_criterion, optimizer,dae_loss,tempr,add_clf_loss)
         else:
             losses, top1, top3 = train_dae_step(trainloader, model_clf,model_comb, dae_criterion, optimizer,dae_loss,tempr,std,add_clf_loss)
 
@@ -475,7 +475,7 @@ def train_dae_step(data_loader, model_clf,model_comb,criterion, optimizer,dae_lo
             loss2 = criterion(outputs/tempr,outputs_c/tempr)
             loss = 0.5*loss1+0.5*loss2
         else:
-            loss = criterion(outputs, outputs_)
+            loss = criterion(outputs_,outputs.detach())
 
         if add_clf_loss:
             loss = 0.5*loss + 0.5*criterion_clf(outputs_, targets)
@@ -528,7 +528,7 @@ def train_adv_step(advloader,model_clf,model_comb,criterion,optimizer,dae_loss,t
             loss2 = criterion(outputs / tempr, outputs_c / tempr)
             loss = 0.5 * loss1 + 0.5 * loss2
         else:
-            loss = criterion(outputs, outputs_)
+            loss = criterion(outputs_, outputs.detach())
 
         if add_clf_loss:
             loss = 0.5 * loss + 0.5 * criterion_clf(outputs_, targets)
