@@ -166,7 +166,7 @@ class CombinedModel:
             criterion = self.clf_criterion
         print(test_clf(self.model_clf,testloader,criterion))
 
-    def train_dae(self, criterion = None, dae_loss = "KL",lr=0.001,tempr=10,std=0.1, epochs = 10,add_clf_loss = False):
+    def train_dae(self, criterion = None, dae_loss = "KL",lr=0.001,tempr=10,std=0.1, epochs = 10,add_clf_loss = False,params = None):
         #assert dae_loss in ['KL','L2','L1','KL_reverse'], 'Error dae_loss should be seleted within [KL,L2,L1,KL_reverse]'
         if criterion is None:
             if dae_loss == 'L1':
@@ -180,8 +180,15 @@ class CombinedModel:
             self.dae_criterion = criterion
             self.dae_loss = dae_loss
             self.tempr = tempr
-        train_dae(self.model_dae, self.model_clf, self.model_comb, self.trainloader,self.testloader, self.dataset,
+        if dae_type =="recon":
+            train_dae(self.model_dae, self.model_clf, self.model_comb, self.trainloader,self.testloader, self.dataset,
                   self.dae_criterion, dae_loss,lr,epochs,tempr,std,self.checkpoint,add_clf_loss)
+        else:
+            #else means dae_type is denoi!
+            self.whitebox_attack(target_model = self.model_clf,dataloader =self.trainloader,batch_size=self.train_batch,params = params)
+            #train_adv_noise(self.model_dae,self.model_comb)
+            train_dae(self.model_dae, self.model_clf, self.model_comb, self.trainloader,self.testloader, self.dataset,
+                  self.dae_criterion, dae_loss,lr,epochs,tempr,std,self.checkpoint,add_clf_loss,True)
 
     def test_dae(self, testloader =None, noise_std=0, tempr=None):
         if tempr is None:
@@ -193,6 +200,9 @@ class CombinedModel:
     def whitebox_attack(self,target_model = None, dataloader = None, batch_size = None, target_object = 'clf',
                         attacker = 'pgd', shuffle = True,
                         params = {'eps':8/255,'niter':20, 'alpha':2/255,'normalize':'0/1'}):
+        if params is None:
+            params = {'eps': 8 / 255, 'niter': 20, 'alpha': 2 / 255, 'normalize': '0/1'}
+        self.params = params
         if target_model is None:
             if target_object == 'clf':
                 target_model = self.model_clf
@@ -207,7 +217,7 @@ class CombinedModel:
         self.advloader = DataLoader(self.advModel.advDataSet,batch_size, shuffle=shuffle, num_workers = 0)
         return self.advloader
 
-
+#def train_adv_noise():
 
 def load_data(dataset = "mnist",transform=None, train_batch=128,
               test_batch = 100, workers=16):
@@ -364,7 +374,8 @@ def train_clf_step(model,trainloader,epoch,epochs,criterion,optimizer):
     return losses, top1, top3
 
 def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dataset = "mnist",dae_criterion = None,dae_loss="KL", lr = 0.001,
-              epochs = 50, tempr = 10, std = 0.1, checkpoint='checkpoint',add_clf_loss = False):
+              epochs = 50, tempr = 10, std = 0.1, checkpoint='checkpoint',add_clf_loss = False, adv_expl = False):
+
     assert dae_criterion is not None, 'Error dae_criterion should be specified ex. nn.L1Loss()'
     #checkpoint = checkpoint+'/'+dataset
 
@@ -394,14 +405,17 @@ def train_dae(model_dae, model_clf, model_comb, trainloader,testloader,dataset =
     for epoch in range(epochs):
         model_dae.train()
         print('\nEpoch: [%d |%d] ' % (epoch + 1, epochs))
-
-        losses, top1, top3 = train_dae_step(trainloader, model_clf,model_comb, dae_criterion, optimizer,dae_loss,tempr,std,add_clf_loss)
+        if adv_expl:
+            #Here, trainloader is advloader!!
+            losses, top1, top3 = train_adv_step(trainloader, model_clf,model_comb, dae_criterion, optimizer,dae_loss,tempr,std,add_clf_loss)
+        else:
+            losses, top1, top3 = train_dae_step(trainloader, model_clf,model_comb, dae_criterion, optimizer,dae_loss,tempr,std,add_clf_loss)
 
         # Test models
         # test error for clean images and reconstructed images
-        test_loss, test_acc, test_acc3 = test_dae(model_clf,model_comb, testloader, dae_criterion,dae_loss, False,tempr)
+        test_loss, test_acc, test_acc3 = test_dae(model_clf,model_comb, testloader, dae_criterion,dae_loss, False,tempr,add_clf_loss)
         #test error for Ganssian corrupted images
-        test_loss_n, test_acc_n, test_acc3_n = test_dae(model_clf,model_comb, testloader,dae_criterion,dae_loss, std, tempr)
+        test_loss_n, test_acc_n, test_acc3_n = test_dae(model_clf,model_comb, testloader,dae_criterion,dae_loss, std, tempr,add_clf_loss)
 
         print('Training/cleanTest/noiseTest [loss] %.4f / %.4f / %.4f, [top1] %.2f / %.2f / %.2f, [top3] %.2f / %.2f / %.2f' %
               (losses.avg, test_loss,test_loss_n,  top1.avg,  test_acc, test_acc_n, \
@@ -481,7 +495,57 @@ def train_dae_step(data_loader, model_clf,model_comb,criterion, optimizer,dae_lo
 
     return losses, top1, top3
 
+def train_adv_step(advloader,model_clf,model_comb,criterion,optimizer,dae_loss,tempr,add_clf_loss = False):
 
+    losses = AverageMeter()
+    top1 = AverageMeter()
+    top3 = AverageMeter()
+    if add_clf_loss:
+        criterion_clf = nn.CrossEntropyLoss()
+    for batch_idx, (inputs,adv_imgs, targets) in enumerate(advloader):
+        #noise_inputs = noise(inputs, std)
+        adv_imgs, inputs, targets = adv_imgs.cuda(), inputs.cuda(), targets.cuda()
+        adv_imgs, inputs, targets = Variable(adv_imgs), Variable(inputs), Variable(targets)
+
+        outputs = model_clf(inputs)
+        # noise_ = model_dae(noise_inputs)
+        # denoise_inputs = torch.clamp(noise_inputs + noise_, 0, 1)
+        # denoise_inputs = model_dae(noise_inputs)
+        _, outputs_ = model_comb(adv_imgs)
+
+        if dae_loss == 'KL':
+            loss = criterion(outputs_ / tempr, outputs / tempr)
+        elif dae_loss == 'KL_reverse':
+            loss = criterion(outputs_ / tempr, outputs / tempr, True)
+        elif dae_loss == 'tripleKL':
+            _, outputs_c = model_comb(inputs)
+            loss1 = criterion(outputs_ / tempr, outputs / tempr)
+            loss2 = criterion(outputs_c / tempr, outputs / tempr)
+            loss = 0.5 * loss1 + 0.5 * loss2
+        elif dae_loss == 'tripleKL_reverse':
+            _, outputs_c = model_comb(inputs)
+            loss1 = criterion(outputs / tempr, outputs_ / tempr)
+            loss2 = criterion(outputs / tempr, outputs_c / tempr)
+            loss = 0.5 * loss1 + 0.5 * loss2
+        else:
+            loss = criterion(outputs, outputs_)
+
+        if add_clf_loss:
+            loss = 0.5 * loss + 0.5 * criterion_clf(outputs_, targets)
+
+        prec1, prec3 = accuracy(outputs_.data, targets.data, topk=(1, 3))
+        if (batch_idx) % 10 == 1:
+            print("Training [loss] %.4f [Acc] top1: %.2f , top3: %.2f " % (loss, prec1, prec3))
+
+        losses.update(loss.data[0], inputs.size(0))
+        top1.update(prec1[0], inputs.size(0))
+        top3.update(prec3[0], inputs.size(0))
+
+        # Training the models
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+    return losses, top1, top3
 """
 class train_dae():
     def __init__(self, model_dae, model_clf, data_loader, dae_loss= args.dae_loss, lr = args.lr,
@@ -554,11 +618,11 @@ def test_clf3(model, tripleloader, criterion):
     return (losses.avg, top1.avg, top3.avg),(losses2.avg,top12.avg,top32.avg)
 
 
-def test_dae(model_clf, model_comb, testloader, criterion,dae_loss, noise_std=False, tempr=1):
+def test_dae(model_clf, model_comb, testloader, criterion,dae_loss, noise_std=False, tempr=1,add_clf_loss = False):
     losses = AverageMeter()
     top1 = AverageMeter()
     top3 = AverageMeter()
-
+    criterion_clf = nn.CrossEntropyLoss()
     model_clf.eval()
     model_comb.eval()
 
@@ -577,9 +641,30 @@ def test_dae(model_clf, model_comb, testloader, criterion,dae_loss, noise_std=Fa
             loss = criterion(outputs_ / tempr, outputs / tempr)
         elif dae_loss == 'KL_reverse':
             loss = criterion(outputs_ / tempr, outputs / tempr, True)
+        elif dae_loss == 'tripleKL':
+            _, outputs_c = model_comb(inputs)
+            loss1 = criterion(outputs_ / tempr, outputs / tempr)
+            loss2 = criterion(outputs_c / tempr, outputs / tempr)
+            loss = 0.5 * loss1 + 0.5 * loss2
+        elif dae_loss == 'tripleKL_reverse':
+            _, outputs_c = model_comb(inputs)
+            loss1 = criterion(outputs / tempr, outputs_ / tempr)
+            loss2 = criterion(outputs / tempr, outputs_c / tempr)
+            loss = 0.5 * loss1 + 0.5 * loss2
         else:
             loss = criterion(outputs, outputs_)
 
+        if add_clf_loss:
+            loss = 0.5 * loss + 0.5 * criterion_clf(outputs_, targets)
+
+        """
+        if dae_loss == 'KL':
+            loss = criterion(outputs_ / tempr, outputs / tempr)
+        elif dae_loss == 'KL_reverse':
+            loss = criterion(outputs_ / tempr, outputs / tempr, True)
+        else:
+            loss = criterion(outputs, outputs_)
+        """
         prec1, prec3 = accuracy(outputs_.data, targets.data, topk=(1, 3))
         losses.update(loss.data[0],inputs.size(0))
         top1.update(prec1[0],inputs.size(0))
