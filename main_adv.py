@@ -145,10 +145,11 @@ class CombinedModel:
         self.trainloader, self.testloader = load_data(self.dataset, self.transform, self.train_batch,
                                                   self.test_batch, self.workers)
 
-    def construct_model(self,checkpoint = 'checkpoint', dae_type='recon'):
+    def construct_model(self,checkpoint = 'checkpoint', dae_type='recon',noise_level = 8/255):
         self.checkpoint = checkpoint
         self.dae_type = dae_type
-        self.model_clf, self.model_dae, self.model_comb = load_model(self.dataset,checkpoint,load_clf = False,dae_type = dae_type)
+        self.noise_level= noise_level
+        self.model_clf, self.model_dae, self.model_comb = load_model(self.dataset,checkpoint,load_clf = False,dae_type = dae_type,noise_level = noise_level)
 
     def load_model(self,checkpoint, model_type):
         # should implement
@@ -176,6 +177,7 @@ class CombinedModel:
             else:
                 self.dae_criterion = kl_loss
             self.dae_checkpoint = self.checkpoint+'/'+dae_loss
+            self.dae_loss = dae_loss
         else:
             self.dae_criterion = criterion
             self.dae_loss = dae_loss
@@ -195,7 +197,7 @@ class CombinedModel:
             tempr = self.tempr
         if testloader is None:
             testlaoder = self.testloader
-        test_dae(self.model_clf,self.model_comb,testloader, self.dae_criterion, self.dae_loss,noise_std,tempr)
+        return test_dae(self.model_clf,self.model_comb,testloader, self.dae_criterion, self.dae_loss,noise_std,tempr)
 
     def whitebox_attack(self,target_model = None, dataloader = None, batch_size = None, target_object = 'clf',
                         attacker = 'pgd', shuffle = True,
@@ -262,7 +264,7 @@ def load_data(dataset = "mnist",transform=None, train_batch=128,
 
     return trainloader, testloader
 
-def load_model(dataset = "mnist",checkpoint = 'checkpoint', load_clf=None,dae_type = 'recon'):
+def load_model(dataset = "mnist",checkpoint = 'checkpoint', load_clf=None,dae_type = 'recon',noise_level = 8/255):
     checkpoint = checkpoint+'/'+dataset
 
     if not os.path.isdir(checkpoint):
@@ -298,7 +300,7 @@ def load_model(dataset = "mnist",checkpoint = 'checkpoint', load_clf=None,dae_ty
         checkpoint = os.path.dirname(load_clf)
         checkpoint = torch.load(load_clf)
         model_clf.load_state_dict(checkpoint['state_dict'])
-    model_comb = models.combine_model(model_dae=model_dae, model_clf = model_clf,dae_type=dae_type)
+    model_comb = models.combine_model(model_dae=model_dae, model_clf = model_clf,dae_type=dae_type,e=noise_level)
     model_clf = nn.DataParallel(model_clf).cuda()
     model_dae = nn.DataParallel(model_dae).cuda()
     model_comb = nn.DataParallel(model_comb).cuda()
@@ -652,7 +654,7 @@ def test_dae(model_clf, model_comb, testloader, criterion,dae_loss, noise_std=Fa
             loss2 = criterion(outputs / tempr, outputs_c / tempr)
             loss = 0.5 * loss1 + 0.5 * loss2
         else:
-            loss = criterion(outputs, outputs_)
+            loss = criterion(outputs_, outputs.detach())
 
         if add_clf_loss:
             loss = 0.5 * loss + 0.5 * criterion_clf(outputs_, targets)
