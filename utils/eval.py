@@ -78,6 +78,28 @@ class GaussianDataSet(Dataset):
 
     def __len__(self):
         return self.len
+class UniformDataSet(Dataset):
+    def __init__(self,inputs_tensor, targets_tensor, epsilon=4./255., lb = 0.0,ub = 1.0):
+        super(UniformDataSet, self).__init__()
+        self.inputs_tensor = inputs_tensor
+        self.targets_tensor = targets_tensor
+        self.epsilon = epsilon
+        self.lb = lb
+        self.ub = ub
+        self.generate_random()
+
+    def generate_random(self):
+        self.noise_tensor = self.inputs_tensor + self.epsilon*(torch.rand_like(self.inputs_tensor)*2-1)
+        self.noise_tensor = torch.clamp(self.noise_tensor,self.low,self.high)
+    def __getitem__(self,item):
+        img = self.inputs_tensor[item]
+        noise_img = self.noise_tensor[item]
+        target = self.targets_tensor[item]
+        return img, noise_img, target
+
+
+
+
 
 class TripleDataSet(Dataset):
     def __init__(self,inputs_tensor1, inputs_tensor2,targets_tensor):
